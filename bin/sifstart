@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+
+help()
+{
+  echo "Usage: sifstart [ -n | --name ]
+              [ -a | --args ]
+              [ -w | --writable ]
+              [ -f | --force ]
+              [ -v | --verbose ]
+              [ -h | --help ]
+              SIF_PATH"
+  exit 2
+}
+
+###############################################################################
+# Process command line arguments
+###############################################################################
+
+SHORTOPTS=n:,a:,w,f,v,h
+LONGOPTS=name:,args:,writable,force,verbose,help
+OPTS=$(getopt -a -n sifstart --options $SHORTOPTS --longoptions $LONGOPTS -- "$@")
+[ $? -ne 0 ] && help
+
+eval set -- "$OPTS"
+
+APPTAINER_USER_ARGS=""
+while :
+do
+  case "$1" in
+    -n | --name )
+      TARGET_INST_NAME="$2"
+      shift 2
+      ;;
+    -a | --args )
+      APPTAINER_USER_ARGS+=" --$2"
+      shift 2
+      ;;
+    -w | --writable )
+      RUN_AS_WRITABLE="yes"
+      APPTAINER_USER_ARGS+=" --fakeroot --writable"
+      shift
+      ;;
+    -f | --force)
+      OVERRIDE_INSTANCE="yes"
+      shift
+      ;;
+    -v | --verbose)
+      VERBOSE="yes"
+      shift
+      ;;
+    -h | --help)
+      help
+      ;;
+    --)
+      shift;
+      break
+      ;;
+    *)
+      echo "Unexpected option: $1"
+      help
+      ;;
+  esac
+done
+
+if [ $# -eq 0 ] && [ -z $SIFSTART_TARGET_SIF_PATH ]
+then
+  help
+fi
+
+
+###############################################################################
+# Variable setup
+###############################################################################
+
+TARGET_SIF_PATH="${SIFSTART_TARGET_SIF_PATH:-$1}"
+TARGET_SIF_FILENAME="$(basename $TARGET_SIF_PATH)"
+if [ -z "$TARGET_INST_NAME" ]; then
+  TARGET_INST_NAME="${SIFSTART_TARGET_INST_NAME:-$TARGET_SIF_FILENAME}"
+fi
+TARGET_CACHE_DIR=${SIFSTART_CACHE_DIR:-$HOME/.apptainer/run/cache}
+TARGET_CACHE_DIR="$TARGET_CACHE_DIR/$TARGET_SIF_FILENAME"
+TARGET_PID_FILE="/tmp/sifstart_$TARGET_INST_NAME"
+
+###############################################################################
+# Helper functions
+###############################################################################
+
+function get_nvidia_options()
+{
+  local opt=""
+  if [ ! -z "$(nvidia-smi)" ]
+  then
+      opt="--nv"
+  fi
+  echo $opt
+}
+
+function get_home_options()
+{
+  local opt=""
+  if [ -z $RUN_AS_WRITABLE ]
+  then
+    mkdir -p $TARGET_CACHE_DIR/home
+    opt+=" --home $TARGET_CACHE_DIR/home:$HOME"
+  else
+    mkdir -p $TARGET_CACHE_DIR/root
+    opt+=" --home $TARGET_CACHE_DIR/root:/root"
+  fi
+  echo $opt
+}
+
+function get_bind_options()
+{
+  local opt=""
+  echo $opt
+}
+
+function get_instance_pid_option()
+{
+  local opt=""
+  opt+=" --pid-file $TARGET_PID_FILE"
+  echo $opt
+}
+
+function main()
+{
+  local opt=""
+  opt+=" $(get_nvidia_options)"
+  opt+=" $(get_home_options)"
+  opt+=" $(get_bind_options)"
+  opt+=" $(get_instance_pid_option)"
+  opt+=$APPTAINER_USER_ARGS
+  [ "$VERBOSE" ] && echo "Starting instance $TARGET_INST_NAME from image $TARGET_SIF_PATH"
+  [ "$VERBOSE" ] && echo "with options: $opt"
+  if [ -z "$(apptainer instance list | grep $TARGET_INST_NAME)" ]
+  then
+      apptainer instance start $opt $TARGET_SIF_PATH $TARGET_INST_NAME || return 1
+  else
+      echo "Apptainer instance with name $TARGET_INST_NAME already exists."
+      if [ ! -z "$OVERRIDE_INSTANCE" ]; then
+          [ "$VERBOSE" ] && echo "--force is given. Shutting down existing instance..."
+          apptainer instance stop $TARGET_INST_NAME || return 1
+          apptainer instance start $opt $TARGET_SIF_PATH $TARGET_INST_NAME || return 1
+      else
+          [ "$VERBOSE" ] && echo "Doing nothing!"
+      fi
+  fi
+  return 0
+}
+
+###############################################################################
+# Main 
+###############################################################################
+
+main
+ret=$?
+if [ "$ret" -ne "0" ]; then
+  >&2 echo "FATAL: Container instance was not started!"
+  exit 1
+fi
