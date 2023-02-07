@@ -37,7 +37,6 @@ do
       ;;
     -w | --writable )
       RUN_AS_WRITABLE="yes"
-      APPTAINER_USER_ARGS+=" --fakeroot --writable"
       shift
       ;;
     -f | --force)
@@ -76,6 +75,9 @@ TARGET_SIF_PATH="${SIFSTART_TARGET_SIF_PATH:-$1}"
 TARGET_SIF_FILENAME="$(basename $TARGET_SIF_PATH)"
 if [ -z "$TARGET_INST_NAME" ]; then
   TARGET_INST_NAME="${SIFSTART_TARGET_INST_NAME:-$TARGET_SIF_FILENAME}"
+fi
+if [ "$RUN_AS_WRITABLE" ]; then
+  TARGET_INST_NAME="${TARGET_INST_NAME}_root"
 fi
 TARGET_CACHE_DIR=${SIFSTART_CACHE_DIR:-$HOME/.apptainer/run/cache}
 TARGET_CACHE_DIR="$TARGET_CACHE_DIR/$TARGET_SIF_FILENAME"
@@ -122,6 +124,18 @@ function get_instance_pid_option()
   echo $opt
 }
 
+function get_writable_option()
+{
+  local opt=""
+  if [ -z $RUN_AS_WRITABLE ]
+  then
+    opt+=" --writable-tmpfs"
+  else
+    opt+=" --writable --fakeroot"
+  fi
+  echo $opt
+}
+
 function main()
 {
   local opt=""
@@ -129,6 +143,7 @@ function main()
   opt+=" $(get_home_options)"
   opt+=" $(get_bind_options)"
   opt+=" $(get_instance_pid_option)"
+  opt+=" $(get_writable_option)"
   opt+=$APPTAINER_USER_ARGS
   [ "$VERBOSE" ] && echo "Starting instance $TARGET_INST_NAME from image $TARGET_SIF_PATH"
   [ "$VERBOSE" ] && echo "with options: $opt"
