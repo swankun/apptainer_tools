@@ -1,0 +1,76 @@
+---
+pagetitle: "Apptainer Containers"
+page-layout: full
+section-divs: false
+toc: false
+css: index.css
+editor: source
+description: | 
+  A workshop for Bastian Solutions R&D employees to learn how to incorporate
+  container-based development in their workflow
+---
+
+# Apptainer Workshop
+
+A workshop for Bastian Solutions R&D employees to learn how to incorporate
+container-based development in their workflow
+
+Prepared by: Wankun Sirichotiyakul \
+Date: 10 April 2023
+
+## Agenda
+
+* Why Containers?
+* Docker vs. Apptainer
+* Getting Started with Apptainer
+* Creating and Accessing Images
+* Advanced Examples
+* Workflow Tips
+* Further Readings
+
+
+## Why Containers?
+
+* Portable user space containing its own root filesystem, OS, applications, and
+environment 
+* It solves the problem of: I want to run `ApplicationA`. It
+requires 
+  * `DependencyA==0.7` but I have `DependencyA==0.9`
+  * `DependencyB==0.16` but I have `DependencyB==0.14`
+  * `DependencyC==1.3` but I don't have it
+  * ...
+* Reproducibility $\implies$ faster/easier deployment
+* Think "lightweight virtual machines"
+* Shares kernel with host to minimize overhead
+
+## Docker vs. Apptainer
+
+* Apptainer favors integration over isolation
+  * Simplifies host file operations
+  * Easier to use host GPUs, network interfaces, USB devices, etc. 
+* Docker: well-suited for ephemeral servers 
+  * Short-lived in nature
+  * Microservices
+* Apptainer: well-suited for HPC clusters
+  * Long-running jobs
+  * Multiple users
+* Security
+  * Docker needs root privileges during build and runtime
+  * Apptainer never needs root at runtime, and root can almost always be avoided at build time
+  * Apptainer has privilege escalation prevention features
+
+Further readings:
+
+* [Docker vs. Singularity for data processing: UIDs and filesystem access](https://pythonspeed.com/articles/containers-filesystem-data-processing/)
+* [Performance Benchmark of
+Docker vs Singularity](http://www.diva-portal.org/smash/get/diva2:1277794/FULLTEXT01.pdf)
+
+## Getting Started with Apptainer
+
+
+
+## Further Readings
+
+* [Singularity tutorials](https://youtube.com/playlist?list=PLWhvkMKn3k1zQ4uCw-Oq2Az_q6bkfrktl)
+* [Apptainer: Deep Dive, Use Cases, and Examples](https://www.youtube.com/watch?v=Hj5eTZGUsDM)
+* [Container Education Series: Continuous Integration and Delivery with Apptainer](https://www.youtube.com/live/KZF_ZlrpmKo?feature=share)
