@@ -1,4 +1,11 @@
 ---
+from: markdown+emoji
+format:
+  revealjs: 
+    html-math-method: mathml
+    smaller: false
+    theme: [white, custom.scss]
+    slide-number: true
 pagetitle: "Apptainer Containers"
 page-layout: full
 section-divs: false
@@ -10,66 +17,214 @@ description: |
   container-based development in their workflow
 ---
 
-# Apptainer Workshop
+# Introduction to Apptainer
 
-A workshop for Bastian Solutions R&D employees to learn how to incorporate
-container-based development in their workflow
+Incorporating container-based development in your workflow
 
 Prepared by: Wankun Sirichotiyakul \
-Date: 10 April 2023
+Date: 28 April 2023
 
 ## Agenda
 
-* Why Containers?
+* Containers: What and Why?
 * Docker vs. Apptainer
 * Getting Started with Apptainer
-* Creating and Accessing Images
-* Advanced Examples
-* Workflow Tips
-* Further Readings
+  * Building an image
+  * Running a container
+* My workflow
+
+## Containers
+
+::::{.columns}
+
+:::{.column width="50%"}
+
+:::{ .fragment .fade-in fragment-index=1}
+![](assets/ship.png){fig-align="center"}
+::: 
+<!-- fragment -->
+
+::: {.fragment .fade-in fragment-index=2}
+::: {.callout} 
+
+#### Why Containers?
+* Complex, conflicting sets of dependencies
+* Promotes reproducibility
+* Reduce deployment time
+
+::: 
+<!-- callout -->
+:::
+<!-- fragment -->
+:::
+<!-- column -->
+
+:::{.column width="50%" .fragment .fade-in fragment-index=0}
+![](assets/container_overview.png){fig-align="center"}
 
 
-## Why Containers?
+:::
+<!-- column -->
 
-* Portable user space containing its own root filesystem, OS, applications, and
-environment 
-* It solves the problem of: I want to run `ApplicationA`. It
-requires 
-  * `DependencyA==0.7` but I have `DependencyA==0.9`
-  * `DependencyB==0.16` but I have `DependencyB==0.14`
-  * `DependencyC==1.3` but I don't have it
-  * ...
-* Reproducibility $\implies$ faster/easier deployment
-* Think "lightweight virtual machines"
-* Shares kernel with host to minimize overhead
+
+
+::::
+<!-- columns -->
+
+
+## What About Virtual Machines?
+
+![](assets/vm_vs_container.png)
+
+Container is analogous to a lightweight virtual machine that shares kernel with the host, minimizing overhead
+
+
 
 ## Docker vs. Apptainer
 
-* Apptainer favors integration over isolation
-  * Simplifies host file operations
-  * Easier to use host GPUs, network interfaces, USB devices, etc. 
-* Docker: well-suited for ephemeral servers 
-  * Short-lived in nature
-  * Microservices
-* Apptainer: well-suited for HPC clusters
-  * Long-running jobs
-  * Multiple users
-* Security
-  * Docker needs root privileges during build and runtime
-  * Apptainer never needs root at runtime, and root can almost always be avoided at build time
-  * Apptainer has privilege escalation prevention features
+::: {.fragment .fade-in-then-semi-out fragment-index=0}
+::: {.callout}
+#### Apptainer favors integration over isolation
+* Simplifies host file operations
+* Easier to use host GPUs, network interfaces, USB devices, etc. 
+:::
+:::
 
-Further readings:
+::: {.fragment .fade-in-then-semi-out fragment-index=1}
+::: {.callout}
+#### Apptainer is well-suited for HPC clusters
+* Long-running jobs
+* Shared resources with multiple users
+:::
+:::
+
+::: { .fragment .fade-in-then-semi-out fragment-index=2}
+::: {.callout}
+#### Security
+* Apptainer never needs root at runtime
+* Building apptainer container supports rootless
+* Apptainer has privilege escalation prevention features
+:::
+:::
+
+## Docker vs. Apptainer - Further readings
 
 * [Docker vs. Singularity for data processing: UIDs and filesystem access](https://pythonspeed.com/articles/containers-filesystem-data-processing/)
-* [Performance Benchmark of
-Docker vs Singularity](http://www.diva-portal.org/smash/get/diva2:1277794/FULLTEXT01.pdf)
+* [Performance Benchmarks 1](http://www.diva-portal.org/smash/get/diva2:1277794/FULLTEXT01.pdf)
+* [Performance Benchmarks 2](https://arxiv.org/pdf/1709.10140.pdf)
+
 
 ## Getting Started with Apptainer
 
+Installable via your OS package manager (`apt`, \ `dnf`, \ `rpm`)
 
 
-## Further Readings
+::: {.callout}
+
+#### Building a container
+
+From a Docker image: 
+
+```
+apptainer build mycontainer.sif docker://ubuntu
+```
+
+From a build definition file (analogous to Dockerfile) 
+```
+apptainer build mycontainer.sif mybuild.def
+```
+:::
+
+
+```{.bash filename="mybuild.def" code-line-numbers="|1-2|4-7|9-10"}
+Bootstrap: docker
+From: ubuntu
+
+%post
+  apt update && apt install -y --no-install-recommends \
+      vim \
+      curl
+
+%runscript
+  echo 'Hello, World!'
+
+```
+
+
+## Getting Started with Apptainer
+
+::: {.callout}
+#### Running a container
+
+Interactive shell:
+
+```
+apptainer shell mycontainer.sif
+```
+
+Execute a command 
+```
+apptainer exec mycontainer.sif echo 'Hello World'
+```
+
+Run a user-defined runscript 
+```
+apptainer run mycontainer.sif
+```
+:::
+
+::: {.callout-warning}
+#### SIF container image is immutable
+
+* Useful for deployment, running on HPC, etc.
+* Hinders ease of development
+* Use `--writable-tmpfs` for non-persistent changes
+* Use *sandbox* for persisting changes, but with caution: your changes
+
+  ```
+  apptainer build --sandbox mycontainer.sif docker://ubuntu
+  apptainer shell --fakeroot --writable mycontainer.sif
+  ```
+:::
+
+
+
+## My Workflow: Leveraging SSH
+
+Running a container typically needs many options
+```{.bash}
+APPTAINER_SHELL=/bin/bash apptainer shell --nv --writable-tmpfs \
+  --home /mnt/data/apptainer/runtime/noetic/home:/home/$USER \
+  --bind /mnt/data/projects:/home/$USER/Apptainer \
+  /mnt/data/apptainer/images/prism/develop_0.1.0.sif 
+```
+
+We can leverage `SSH.RemoteCommand` to make our lives easier
+```{.bash filename="~/.ssh/config/containers" }
+Host container.my_first_one
+    Hostname localhost
+    RemoteCommand APPTAINER_SHELL=/bin/bash apptainer shell --nv --writable-tmpfs \
+        --home /path/to/home:/home/$USER \
+        --bind /other/path/to/bind:/home/$USER/Apptainer \
+        /path/to/container/my_first_one
+    ForwardAgent yes
+    RequestTTY yes
+```
+
+
+::: {.callout-tip}
+#### Accessing container via SSH
+
+As simple as 
+```
+$ ssh container.my_first_one
+$ Apptainer> # now you're in
+```
+
+We can now leverage the remote development features of any IDE by running it inside the container and make use of the full dependency set 
+:::
+
+## YouTube tutorials
 
 * [Singularity tutorials](https://youtube.com/playlist?list=PLWhvkMKn3k1zQ4uCw-Oq2Az_q6bkfrktl)
 * [Apptainer: Deep Dive, Use Cases, and Examples](https://www.youtube.com/watch?v=Hj5eTZGUsDM)
